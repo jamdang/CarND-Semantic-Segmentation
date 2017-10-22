@@ -124,12 +124,12 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     # TODO: Implement function
     print('training...')
     for epoch in range(epochs):
-        print('epoch {} : '.format(epoch+1))
+        print('epoch {} --------------------------------------------------- '.format(epoch+1))
         batch_count = 0
         loss        = 0
         for batch_image, batch_label in get_batches_fn(batch_size):
             batch_count += 1
-            print('batch {} '.format(batch_count))
+
             ##print('batch_image info ')
             ##print(batch_image.shape)
             ##print('batch_label info ')
@@ -138,7 +138,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                                             learning_rate: 1e-3})
 			## calc training loss
             loss += batch_loss ##sess.run(cross_entropy_loss, feed_dict={input_image: batch_image, correct_label: batch_label})
-
+            print("batch {} with loss {}".format(batch_count,batch_loss))
 		## print out the loss during training in this epoch
 
         loss /= batch_count
@@ -154,7 +154,7 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     ##tests.test_for_kitti_dataset(data_dir)
-    epochs = 2 # 10
+    epochs = 5 # 10
     batch_size = 5
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
@@ -208,7 +208,7 @@ def run():
 
 
         # TODO: Save inference data using helper.save_inference_samples
-        #  helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
+        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
 
         # OPTIONAL: Apply the trained model to a video
