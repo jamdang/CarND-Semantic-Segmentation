@@ -59,24 +59,36 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     # TODO: Implement function
 
 	## 1-by-1 convolution (with regularizer)
-    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same', kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+    conv_1x1 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, strides=(1,1), padding='same',
+                                                kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3),
+                                                kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
 	##  transposed convolution
-    output = tf.layers.conv2d_transpose(conv_1x1, num_classes, 4, strides=(2, 2), padding='same', kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.layers.conv2d_transpose(conv_1x1, num_classes, 4, strides=(2, 2), padding='same',
+                                                  kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3),
+                                                  kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
 	## skip connection
-    layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), padding='same')
+    layer4 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, strides=(1,1), padding='same',
+                                              kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3),
+                                              kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     output = tf.add(output, layer4)
 
 	##  transposed convolution
-    output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same', kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.layers.conv2d_transpose(output, num_classes, 4, strides=(2, 2), padding='same',
+                                                kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3),
+                                                kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
 	## skip connection
-    layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), padding='same')
+    layer3 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, strides=(1,1), padding='same',
+                                              kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3),
+                                              kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
     output = tf.add(output, layer3)
 
 	##  transposed convolution
-    output = tf.layers.conv2d_transpose(output, num_classes, 16, strides=(8, 8), padding='same', kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3))
+    output = tf.layers.conv2d_transpose(output, num_classes, 16, strides=(8, 8), padding='same',
+                                                kernel_regularizer = tf.contrib.layers.l2_regularizer(1e-3),
+                                                kernel_initializer=tf.truncated_normal_initializer(stddev=0.01))
 
     return output
 tests.test_layers(layers)
@@ -123,26 +135,46 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     """
     # TODO: Implement function
     print('training...')
+    loss_last = 1000
+    rate = 0.8e-3
     for epoch in range(epochs):
-        print('epoch {} --------------------------------------------------- '.format(epoch+1))
+        print('--------------------------------------- epoch {} ---------------------------------------------- '.format(epoch+1))
         batch_count = 0
         loss        = 0
+        num_input_image = 0
+        if epoch > 0:
+            rate = min(rate, 1e-3)
+            rate = max(rate, 1e-4)
         for batch_image, batch_label in get_batches_fn(batch_size):
             batch_count += 1
-
             ##print('batch_image info ')
             ##print(batch_image.shape)
             ##print('batch_label info ')
             ##print(batch_label.shape)
-            op, batch_loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: batch_image, correct_label: batch_label, keep_prob: 0.5,
-                                            learning_rate: 1e-3})
+            op, batch_loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: batch_image, correct_label: batch_label, keep_prob: 0.3,
+                                            learning_rate: rate})
 			## calc training loss
-            loss += batch_loss ##sess.run(cross_entropy_loss, feed_dict={input_image: batch_image, correct_label: batch_label})
-            print("batch {} with loss {}".format(batch_count,batch_loss))
+            loss += batch_loss * len(batch_image) ##sess.run(cross_entropy_loss, feed_dict={input_image: batch_image, correct_label: batch_label})
+            num_input_image += len(batch_image)
+            print('batch {} '.format(batch_count) + ' with loss {0:.3f}'.format(batch_loss))
 		## print out the loss during training in this epoch
 
-        loss /= batch_count
-        print('Training loss : {}'.format(loss))
+        loss /= num_input_image
+        print('Training loss : {}'.format(loss) + ' with learning_rate: {}'.format(rate))
+
+        rel_loss_diff = (loss_last - loss)/loss_last
+        if rel_loss_diff < 0.001 :
+            if loss < 2e-2 :
+                break
+            else:
+                rate *= 1/5
+
+        elif rel_loss_diff < 0.1:
+            rate *= 2/3
+        elif rel_loss_diff < 0.05:
+            rate *= 1/3
+
+        loss_last = loss
 
 tests.test_train_nn(train_nn)
 print('train_nn() checkpoint')
@@ -154,8 +186,8 @@ def run():
     data_dir = './data'
     runs_dir = './runs'
     ##tests.test_for_kitti_dataset(data_dir)
-    epochs = 5 # 10
-    batch_size = 5
+    epochs = 7 # 10
+    batch_size = 7
     # Download pretrained vgg model
     helper.maybe_download_pretrained_vgg(data_dir)
 
@@ -202,11 +234,12 @@ def run():
         ## run this initializer after your graph has been defined!!!
         sess.run(tf.global_variables_initializer())
 
+
         # TODO: Train NN using the train_nn function
         train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_loss, input_image, correct_label, keep_prob,
                                                                      learning_rate)
 
-
+        writer = tf.summary.FileWriter("./tmp/log1", sess.graph)
         # TODO: Save inference data using helper.save_inference_samples
         helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image)
 
